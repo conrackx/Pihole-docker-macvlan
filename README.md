@@ -169,4 +169,69 @@ sudo nmcli connection up pihole-bridge
 **¿Por qué es mejor así?**
 Al usar `nmcli`, la interfaz virtual y la ruta se gestionan como cualquier otra conexión de red de Lubuntu. No necesitas scripts en el arranque ni desactivar `systemd-resolved`, ya que Pi-hole vive en su propia "parcela" de red (`192.168.0.10`) y no interfiere con el puerto 53 de la IP principal del host.
 
+---
+
+## 🚀 Paso Extra Opcional: Gestión Visual con Portainer CE
+
+Para una administración avanzada y visual de tus contenedores, instalaremos **Portainer Community Edition (CE)**. Esto permite monitorear el rendimiento de Pi-hole, ver logs y gestionar actualizaciones de **Docker 29.1.3** desde un panel web, evitando el uso constante de la terminal.
+
+### 1. Consideraciones de Configuración
+
+* **Sin puerto 8000:** Se ha omitido este puerto para prescindir de las funciones "Edge", simplificando la exposición de puertos.
+* **Socket de Docker:** El contenedor accede al socket local para controlar el motor Docker del host.
+* **Persistencia de datos:** Toda la configuración de usuarios y entornos se guarda en un directorio local.
+
+### 2. Implementación mediante Docker Compose
+
+En lugar de un comando largo, utilizaremos un archivo de configuración dedicado.
+
+1. **Crea el directorio y el archivo:**
+```bash
+mkdir -p ~/portainer && cd ~/portainer
+nano portainer-compose.yaml
+
+```
+
+
+2. **Pega el siguiente contenido en el archivo:**
+```yaml
+services:
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: always
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock # Control del socket local
+      - ./portainer_data:/data                    # Datos persistentes
+    ports:
+      - "9443:9443"                               # Solo puerto HTTPS seguro
+
+```
+
+
+3. **Despliega el panel:**
+```bash
+sudo docker compose -f portainer-compose.yaml up -d
+
+```
+
+
+
+### 3. Acceso y Comportamiento de Red
+
+Gracias a la estructura de red que configuramos para la macvlan y el bridge (`shim`), notarás que el panel es accesible desde dos rutas distintas dentro de tu red local:
+
+* **Ruta Física:** `https://192.168.0.200:9443`
+* **Ruta del Puente (Shim):** `https://192.168.0.51:9443`
+
+Este acceso dual ocurre porque Portainer opera en la red *bridge* interna de Docker, la cual se vincula automáticamente a todas las interfaces lógicas de Lubuntu, incluyendo la interfaz virtual creada para comunicarse con Pi-hole.
+
+### 4. Configuración en la Interfaz (GUI)
+
+1. **Certificado de Seguridad:** Al entrar, el navegador mostrará una advertencia. Selecciona **Avanzado** y luego **Continuar** (es normal, ya que Portainer usa un certificado auto-firmado).
+2. **Registro de Administrador:** Crea tu usuario y contraseña de inmediato. Si pasan más de 12 minutos sin completar este paso, deberás reiniciar el contenedor por seguridad: `sudo docker restart portainer`.
+3. **Conexión con el Entorno:** Una vez dentro, selecciona el entorno **"Local"**. Verás instantáneamente tu stack de Pi-hole y podrás gestionar sus recursos de forma visual.
 
